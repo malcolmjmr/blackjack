@@ -2,6 +2,9 @@
 
 INITIAL_BALANCE = 200
 MINIMUM_BET = 10
+BLACKJACK = 21
+DEALER_MIN_TOTAL = 17
+
 
 def new_deck
   suits = ['H', 'D', 'S', 'C']
@@ -11,15 +14,14 @@ def new_deck
 end 
 
 def deal_cards(app)
-  app[:curr_game][:player_cards] << app[:deck].pop
-  app[:curr_game][:dealer_cards] << app[:deck].pop
-  app[:curr_game][:player_cards] << app[:deck].pop
-  app[:curr_game][:dealer_cards] << app[:deck].pop
+  2.times do
+    app[:curr_game][:player_cards] << app[:deck].pop
+    app[:curr_game][:dealer_cards] << app[:deck].pop
+  end 
 
-  if calculate_total(app[:curr_game][:player_cards]) == 21
+  if calculate_total(app[:curr_game][:player_cards]) == BLACKJACK
     app[:curr_game][:winner] = 'player'
   end 
-  nil
 end
 
 def show_cards(app)
@@ -28,32 +30,29 @@ def show_cards(app)
   dealer_cards = app[:curr_game][:dealer_cards]
   
   puts "Your cards: "
-  player_cards.each{|card| draw_card(card)}
+  draw_cards(player_cards)
   puts "Dealer's cards: "
   # Reveal 
   if app[:curr_game][:dealer_done]
-    dealer_cards.each{|card| draw_card(card)}
+    draw_cards(dealer_cards)
   else 
-    draw_card(dealer_cards[0])
-    draw_hidden_card
+    draw_cards([dealer_cards[0], ["?","?"]])
   end
-  nil
 end
 
 def dealers_move(app)
   cards = app[:curr_game][:dealer_cards]
   total = calculate_total(cards)
-  while total < 17
+  while total < DEALER_MIN_TOTAL
     cards << app[:deck].pop
     total = calculate_total(cards)
   end
 
-  if calculate_total(cards) > 21
+  if calculate_total(cards) > BLACKJACK
     app[:curr_game][:dealer_bust] = true
   end
 
   app[:curr_game][:dealer_done] = true
-  nil
 end
 
 def welcome(app)
@@ -71,45 +70,52 @@ def get_bet(app)
   app[:curr_game][:bet] = bet
 end 
 
-def get_players_move(app)
+def get_move(app)
   player_cards = app[:curr_game][:player_cards]
+  begin 
+    puts "What would you like to do?"
+    puts "(1) Hit"
+    puts "(2) Stay"
+    if 2 * app[:curr_game][:bet] < app[:player][:balance]
+      puts "(3) Double down" if !app[:curr_game][:doubled_down] && player_cards.count == 2
+      puts "(4) Split" if !app[:curr_game][:split] && splitable(player_cards)
+    end
+    move = gets.chomp.to_i
+  end until move >= 1 && move < 5
+  move
+end
+
+def players_move(app)
   loop do 
-    begin 
-      puts "What would you like to do?"
-      puts "(1) Hit"
-      puts "(2) Stay"
-      if 2 * app[:curr_game][:bet] < app[:player][:balance]
-        puts "(3) Double down" if !app[:curr_game][:doubled_down] && player_cards.count == 2
-        puts "(4) Split" if !app[:curr_game][:split] && splitable(player_cards)
-      end
-      move = gets.chomp.to_i
-    end until move >= 1 && move < 5
+    move = get_move(app)
+    handle_move(move, app)
+    show_cards(app)
+    break if app[:curr_game][:player_bust] || app[:curr_game][:stay] || app[:curr_game][:doubled_down]
+  end 
+end
 
-
-    if move == 1
-      app[:curr_game][:player_cards] << app[:deck].pop
-      app[:curr_game][:player_bust] = true if calculate_total(player_cards) > 21
-    elsif move == 2
+def handle_move(move, app)
+  player_cards = app[:curr_game][:player_cards]
+  case move
+    when 1
+     player_cards << app[:deck].pop
+      app[:curr_game][:player_bust] = true if calculate_total(player_cards) > BLACKJACK
+    when 2
       app[:curr_game][:stay] = true
-      break 
-    elsif move == 3
+   when 3
       app[:curr_game][:doubled_down] = true 
       app[:curr_game][:bet] = 2 * app[:curr_game][:bet]
-      app[:curr_game][:player_cards] << app[:deck].pop
-      app[:curr_game][:player_bust] = true if calculate_total(player_cards) > 21
-      break
-    elsif move == 4
+      player_cards << app[:deck].pop
+      app[:curr_game][:player_bust] = true if calculate_total(player_cards) > BLACKJACK
+    when 4
       player_cards << app[:deck].pop
       player_cards.unshift(app[:deck].pop)
       hand1 = [player_cards[0],player_cards[1]]
       hand2 = [player_cards[2],player_cards[3]]
+      app[:curr_game][:split] = true
       app[:curr_game][:bet] = 2 * app[:curr_game][:bet]
-      app[:curr_game][:player_bust] = true if calculate_total(hand1) > 21 || calculate_total(hand2) > 21
+      app[:curr_game][:player_bust] = true if calculate_total(hand1) > BLACKJACK || calculate_total(hand2) > BLACKJACK
     end
-    show_cards(app)
-    break if app[:curr_game][:player_bust]
-  end 
-  nil
 end
 
 
@@ -134,7 +140,7 @@ def calculate_total(cards)
   end
 
   values.select{|e| e == "A"}.count.times do 
-    total -= 11 if total > 21
+    total -= 11 if total > BLACKJACK
   end
   total 
 end 
@@ -142,12 +148,12 @@ end
 def there_is_winner(app)
   player_cards = app[:curr_game][:player_cards]
   dealer_cards = app[:curr_game][:dealer_cards]
-  if calculate_total(player_cards) == 21 && player_cards.count == 2
+  if calculate_total(player_cards) == BLACKJACK && player_cards.count == 2
     puts "You got blackjack! You win $#{app[:curr_game][:bet]}"
     app[:player][:balance] += app[:curr_game][:bet]
     app[:curr_game][:winner] = 'player'
     return true
-  elsif calculate_total(dealer_cards) == 21 && dealer_cards.count == 2
+  elsif calculate_total(dealer_cards) == BLACKJACK && dealer_cards.count == 2
     puts "Dealer got blackjack! You lose $#{app[:curr_game][:bet]}"
     app[:player][:balance] -= app[:curr_game][:bet]
     app[:curr_game][:winner] = 'dealer'
@@ -190,35 +196,62 @@ def there_is_winner(app)
   return false
 end 
 
-def draw_card(card)
-  s = card[0]
-  v = card[1]
-  if v.length == 1
-    v += ' '
+def draw_cards(cards)
+  cards.each do |c|
+    print " -----------"
+    print "   "
+  end 
+  puts
+  cards.each do |c| 
+    s = c[0]
+
+    print "|#{s}          |"
+    print "  "
   end
-  puts " -----------"
-  puts "|#{s}          |"
-  puts "|           |"
-  puts "|           |"
-  puts "|     #{v}    |"
-  puts "|           |"
-  puts "|           |"
-  puts "|          #{s}|"
-  puts " -----------"
-  nil
+  puts
+  cards.each do |c|
+    print "|           |"
+    print "  "
+  end
+  puts
+  cards.each do |c|
+    print "|           |"
+    print "  "
+  end
+  puts
+  cards.each do |c|
+    v = c[1]
+    if v.length == 1
+      v += ' '
+    end
+    print "|     #{v}    |"
+    print "  "
+  end 
+  puts
+  cards.each do |c|
+    print "|           |"
+    print "  "
+  end 
+  puts
+  cards.each do |c|
+    print "|           |"
+    print "  "
+  end
+  puts
+  cards.each do |c|
+    s = c[0]
+    print "|          #{s}|"
+    print "  "
+  end 
+  puts
+  cards.each do |c|
+    print " -----------"
+    print "   "
+  end
+  puts
 end
 
-def draw_hidden_card
-  puts " -----------"
-  puts "|   ? ? ?   |"
-  puts "|  ?     ?  |"
-  puts "|       ?   |"
-  puts "|     ?     |"
-  puts "|    ?      |"
-  puts "|           |"
-  puts "|    ?      |"
-  puts " -----------"
-  nil
+def draw_hidden_car
 end
 
 def new_game
@@ -242,12 +275,10 @@ def play_another(app)
 
   begin
     puts "Would you like to play another game? (y/n)"
-    y_or_n = gets.chomp.downcase
-  end until y_or_n == 'y' || y_or_n == 'n'
+    answer = gets.chomp.downcase
+  end until %(y n).include? answer
 
-  if y_or_n == 'y'
-    return true 
-  end
+  return true if answer == "y"
   false 
 end
 
@@ -280,7 +311,7 @@ loop do
     get_bet(app)
     deal_cards(app)
     show_cards(app)
-    get_players_move(app)
+    players_move(app)
     dealers_move(app)
     show_cards(app)
     break if there_is_winner(app)
@@ -290,8 +321,6 @@ loop do
 
   app[:history] << app[:curr_game]
   app[:curr_game] = new_game
-
 end
-
 
 
