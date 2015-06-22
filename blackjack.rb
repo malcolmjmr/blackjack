@@ -76,7 +76,7 @@ def get_move(app)
     puts "What would you like to do?"
     puts "(1) Hit"
     puts "(2) Stay"
-    if 2 * app[:curr_game][:bet] < app[:player][:balance]
+    if 2 * app[:curr_game][:bet] <= app[:player][:balance]
       puts "(3) Double down" if !app[:curr_game][:doubled_down] && player_cards.count == 2
       puts "(4) Split" if !app[:curr_game][:split] && splitable(player_cards)
     end
