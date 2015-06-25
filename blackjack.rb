@@ -121,7 +121,7 @@ end
 
 def splitable(cards)
   values = cards.map{|e| e[1]}
-  true if values[0] == values[1]
+  values[0] == values[1]
 end
 
 
@@ -140,7 +140,7 @@ def calculate_total(cards)
   end
 
   values.select{|e| e == "A"}.count.times do 
-    total -= 11 if total > BLACKJACK
+    total -= 10 if total > BLACKJACK
   end
   total 
 end 

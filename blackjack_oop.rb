@@ -1,4 +1,5 @@
 require "pry"
+
 MINIMUM_BET = 10
 INITIAL_BALANCE = 200
 BlACKJACK = 21
@@ -106,14 +107,15 @@ end
 class Deck 
   attr_reader :cards
 
-  def initialize(num_decks)
+  def initialize
+    number_of_decks = [2,3,4,5].sample
     deck = []
     ['H', 'D', 'S', 'C'].each do |suit|
       ['2','3','4','5','6','7','8','9','10', 'J', 'Q', 'K','A'].each do |value|
         deck << Card.new(suit, value)
       end 
     end 
-    @cards = deck * num_decks
+    @cards = deck * number_of_decks
     shuffle_deck
   end
 
@@ -122,6 +124,7 @@ class Deck
   end
 
   def deal(hand)
+    initialize if cards.empty?
     hand.cards << @cards.pop
   end 
 end
@@ -260,7 +263,7 @@ class Dealer < Player
   end 
 end
 
-class Blackjack
+class Game
   attr_accessor :players, :deck
 
   def initialize
@@ -268,7 +271,7 @@ class Blackjack
     get_number_of_players.times do 
       players << Player.new
     end
-    @deck = Deck.new(players.count)
+    @deck = Deck.new
   end
 
   def play
@@ -287,7 +290,7 @@ class Blackjack
       end 
       show_all_cards
       # finish game 
-      announce_winner(get_winner)
+      announce_winners(get_winners)
       settle_bets
       players.each{|player| player.reset}
       break unless play_again?
@@ -329,12 +332,14 @@ class Blackjack
   end
 
   def play_again?
+    players_to_delete = []
     players.each do |player|
       if player.balance < MINIMUM_BET
         puts "I'm sorry #{player.name}, you don't have enough to meet the minimum bet. Come back later when you have more money."
-        players.delete(player)
+        players_to_delete << player
       end
     end 
+    players_to_delete.each{|player| players.delete(player)}
 
     return false if players.count < 2
 
@@ -346,14 +351,16 @@ class Blackjack
     answer == "y"
   end
 
-  def get_winner
-    winner = Player.new("No one")
+  def get_winners
+    dealer = players[players.count - 1]
+    winners = []
     players.each do |player|
-      winner = player if winner.total <= player.total && player.total <= BlACKJACK
-      break if player.hands[0].cards.count == 2 && player.total == BlACKJACK
+      if (player.total > dealer.total && player.total <= 21) || (player.total <= 21 && dealer.total > 21)
+        player.has_won
+        winners.push(player)
+      end
     end 
-    winner.has_won
-    winner
+    winners
   end
 
   def get_number_of_players
@@ -365,8 +372,20 @@ class Blackjack
     answer
   end  
 
-  def announce_winner(winner)
-    puts "#{winner.name} wins!"
+  def announce_winners(winners)
+    if winners.empty?
+      puts "Dealer beat everyone at the table."
+    else 
+      print_win = winners.count > 1 ? "win" : "wins"
+      winners.each_with_index do |winner, i|
+        first_winner = i == 0
+        last_winner = i == winners.count - 1 && winners.count > 1
+        print "#{winner.name}" if first_winner
+        print ", #{winner.name}" unless first_winner || last_winner
+        print " and #{winner.name}" if last_winner
+      end
+      puts " #{print_win}!"
+    end 
   end
 
   def settle_bets
@@ -376,4 +395,4 @@ class Blackjack
   end
 end 
 
-Blackjack.new.play
+Game.new.play
